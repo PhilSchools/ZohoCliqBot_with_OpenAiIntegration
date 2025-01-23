@@ -125,7 +125,7 @@ Use at your own risk and be mindful of any data you submit to the OpenAI API, wh
 
 ## Donations
 
-Feel free to click on the buy me a coffee link in the repo if this helps you out :) - No pressure!
+Feel free to click on the buy me a coffee at [https://buymeacoffee.com/blitzkriegchef](https://buymeacoffee.com/blitzkriegchef) if this helps you out :) - No pressure!
 
 ---
 
