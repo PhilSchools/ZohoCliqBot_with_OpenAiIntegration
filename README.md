@@ -123,6 +123,12 @@ Use at your own risk and be mindful of any data you submit to the OpenAI API, wh
 
 ---
 
+## Donations
+
+Feel free to click on the buy me a coffee link in the repo if this helps you out :) - No pressure!
+
+---
+
 ## Questions or Support
 
 If you encounter any issues, you can reach out to the Zoho community forums.
