@@ -42,9 +42,6 @@ This repository provides a Deluge script that integrates a Zoho Cliq Bot with Op
    - Create an API key under your **API Keys** section.
    - You will need to add a payment method to your OpenAi Platform account and add credits. OpenAi charges for the use of their API be careful of your usage and the costs involved.
 
-3. **Zoho Deluge Environment**  
-   - You should be able to write or edit Deluge scripts in Zoho (via Zoho Flow, Zoho Cliq custom functions, or Zoho CRM functions, depending on your environment).
-
 ---
 
 ## Configuration
