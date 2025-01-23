@@ -1,0 +1,234 @@
+/*******************************************************************
+ * Zoho Cliq Bot - Message Handler with OpenAi (ChatGPT) Integration
+ * GPT Integration with conversation memory in "chatbotconversations"
+ *
+ * -- GPT Cliq Bot v2.0 --
+ *******************************************************************/
+/* 
+   =========================
+   1) CONFIGURATION SECTION
+   =========================
+*/
+// 1.1) OpenAI API Settings
+openaiApiKey = "<ADD YOUR OPENAI API KEY HERE>";
+// Replace with your real OpenAI Key
+openaiEndpoint = "https://api.openai.com/v1/chat/completions";
+defaultOpenAIModel = "gpt-4o";
+// Could switch to "gpt-3.5-turbo"
+defaultTemperature = 0.7;
+// Range typically 0.0 -> 1.0
+defaultMaxTokens = 1000;
+// Increase/decrease as needed
+defaultTopP = 1;
+defaultFreqPenalty = 0;
+defaultPresPenalty = 0;
+// 1.2) Conversation Size Limits
+maxMessagesGroup = 40;
+// how many messages to keep for group threads
+maxMessagesDM = 20;
+// how many messages to keep for direct messages
+// 1.3) Fallback response text
+fallbackText = "Hmm, I'm not sure what to say.";
+// 1.4) System Message
+systemMessageContent = "<ADD YOUR SYSTEM MESSAGE HERE>";
+/* 
+   =========================
+   2) MAIN LOGIC STARTS HERE
+   =========================
+*/
+processChat = Map();
+// Final return object
+//----------------------------------------------------------
+// Debug: Show user and chat details
+//----------------------------------------------------------
+info "=== Debug: user data === " + user.toString();
+info "=== Debug: chat data === " + chat.toString();
+// Extract userId, chatId, chatType
+userId = if(user != null,user.get("id"),null);
+chatId = if(chat != null,chat.get("id"),null);
+chatType = if(chat != null,chat.get("type"),null);
+info "User ID: " + userId;
+info "Chat ID: " + chatId;
+info "Chat Type: " + chatType;
+// Decide if group or direct
+isGroup = false;
+if(chatType != null)
+{
+	if(chatType == "thread" || chatType == "channel" || chatType == "group")
+	{
+		isGroup = true;
+	}
+	else if(chatType == "bot")
+	{
+		info "Treating chatType 'bot' as a direct conversation.";
+		isGroup = false;
+	}
+}
+// Validate userId and chatId
+if(userId == null || chatId == null)
+{
+	info "Null userId or chatId. Exiting.";
+	processChat.put("text","Sorry, I can't identify this conversation properly (missing chat info).");
+	return processChat;
+}
+// Construct a unique conversation key
+convKey = if(isGroup,"GROUP_" + chatId,"DM_" + userId);
+info "Conversation Key: " + convKey;
+if(convKey == null || convKey.trim().length() == 0)
+{
+	info "convKey is null or empty. Exiting.";
+	processChat.put("text","Unable to identify conversation context. Please try again!");
+	return processChat;
+}
+// Retrieve existing records from Data Store
+criteria = Map();
+criteria.put("key",convKey);
+recordsList = zoho.cliq.getRecords("chatbotconversations",criteria);
+info "Records found for convKey '" + convKey + "': " + recordsList.size();
+// Try to get a conversationList from data store
+conversationList = List();
+recordFound = false;
+if(recordsList != null && recordsList.size() > 0)
+{
+	for each  rec in recordsList
+	{
+		info "Examining record: " + rec.toString();
+		if(rec.contains("value"))
+		{
+			possibleValue = rec.get("value");
+			if(possibleValue != null)
+			{
+				// Attempt to cast to a list
+				try 
+				{
+					conversationList = possibleValue.toList();
+					recordFound = true;
+					info "Found a valid conversation List with size: " + conversationList.size();
+					break;
+				}
+				catch (e)
+				{
+					info "Record 'value' could not be converted to a list: " + e.toString();
+				}
+			}
+			else
+			{
+				info "Record has 'value' but is null.";
+			}
+		}
+		else
+		{
+			info "Record does not contain 'value' key.";
+		}
+	}
+}
+else
+{
+	info "No records found for key, starting fresh conversationList.";
+}
+if(!recordFound)
+{
+	info "No valid record was found with a convertible List. Using empty conversationList.";
+}
+// If conversationList is empty, add system message
+if(conversationList.size() == 0)
+{
+	systemMsg = Map();
+	systemMsg.put("role","system");
+	systemMsg.put("content",systemMessageContent);
+	conversationList.add(systemMsg);
+	info "Added new system message as the first item in conversationList.";
+}
+else
+{
+	// If there's something in the list, ensure index 0 is a system message
+	firstItem = conversationList.get(0);
+	if(firstItem == null || firstItem.get("role") != "system")
+	{
+		systemMsg = Map();
+		systemMsg.put("role","system");
+		systemMsg.put("content","A system message was missing so I'm injecting one now.");
+		conversationList.insert(0,systemMsg);
+		info "Inserted system message at index 0 since it was missing.";
+	}
+}
+// Append the user's new message
+userMsg = Map();
+userMsg.put("role","user");
+userMsg.put("content",message);
+conversationList.add(userMsg);
+info "User's message appended. Current convo size: " + conversationList.size();
+// Decide how many messages to keep
+maxMessages = if(isGroup,maxMessagesGroup,maxMessagesDM);
+if(conversationList.size() > maxMessages)
+{
+	systemMessage = conversationList.get(0);
+	recentMessages = conversationList.subList(conversationList.size() - (maxMessages - 1),conversationList.size());
+	conversationList = List();
+	conversationList.add(systemMessage);
+	for each  msg in recentMessages
+	{
+		conversationList.add(msg);
+	}
+	info "Truncated conversation to last " + maxMessages + " entries.";
+}
+// Log final conversation list
+info "Final conversationList before GPT: " + conversationList.toString();
+// Prepare OpenAI payload
+payload = Map();
+payload.put("model",defaultOpenAIModel);
+payload.put("messages",conversationList);
+payload.put("temperature",defaultTemperature);
+payload.put("max_tokens",defaultMaxTokens);
+payload.put("top_p",defaultTopP);
+payload.put("frequency_penalty",defaultFreqPenalty);
+payload.put("presence_penalty",defaultPresPenalty);
+// Log payload
+info "Sending to OpenAI: " + payload.toString();
+// Call OpenAI
+openaiResponse = Map();
+try 
+{
+	openaiResponse = invokeurl
+	[
+		url :openaiEndpoint
+		type :POST
+		parameters:payload.toString()
+		headers:{"Content-Type":"application/json","Authorization":"Bearer " + openaiApiKey}
+	];
+}
+catch (e)
+{
+	info "OpenAI Error: " + e.toString();
+	processChat.put("text","Sorry, I'm having trouble reaching the doghouse of knowledge right now. Please try again later!");
+	return processChat;
+}
+// See raw response
+info "OpenAI raw response: " + openaiResponse.toString();
+// Parse GPT response
+replyText = fallbackText;
+// "Hmm, I'm not sure what to say."
+if(openaiResponse.contains("choices"))
+{
+	choices = openaiResponse.get("choices");
+	if(choices.size() > 0)
+	{
+		assistantMessage = choices.get(0).get("message");
+		replyText = assistantMessage.get("content");
+	}
+}
+info "Reply from GPT: " + replyText;
+// Append final response
+assistantMsg = Map();
+assistantMsg.put("role","assistant");
+assistantMsg.put("content",replyText);
+conversationList.add(assistantMsg);
+// Save updated conversation
+storeMap = Map();
+storeMap.put("key",convKey);
+storeMap.put("value",conversationList);
+zoho.cliq.createRecord("chatbotconversations",storeMap);
+info "Conversation saved to Data Store.";
+// Return final text
+processChat.put("text",replyText);
+return processChat;
