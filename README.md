@@ -117,12 +117,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ---
 
-## Contributing
-
-Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
-
----
-
 ## Disclaimer
 
 Use at your own risk and be mindful of any data you submit to the OpenAI API, which is governed by OpenAI's own terms of service. Always safeguard confidential information. OpenAi API costs money to use, and will require a payment method to be set up and credits to be added, be mindful of your usage and the costs involved.
@@ -131,5 +125,5 @@ Use at your own risk and be mindful of any data you submit to the OpenAI API, wh
 
 ## Questions or Support
 
-If you encounter any issues, you can reach out via the Zoho community forums.
+If you encounter any issues, you can reach out to the Zoho community forums.
 
